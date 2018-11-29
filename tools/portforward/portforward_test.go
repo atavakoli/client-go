@@ -165,10 +165,27 @@ func TestParsePortsAndNew(t *testing.T) {
 		// mock-signal the Ready channel
 		close(readyChan)
 
-		if ports, portErr := pf.GetPorts(); portErr != nil {
+		// mock random ports being selected for zero local-ports
+		for i, _ := range pf.ports {
+			if pf.ports[i].Local == 0 {
+				pf.ports[i].Local = uint16(10001 + i)
+			}
+		}
+
+		ports, portErr := pf.GetPorts()
+		if portErr != nil {
 			t.Fatalf("%d: GetPorts: unable to retrieve ports: %s", i, portErr)
-		} else if !reflect.DeepEqual(test.expectedPorts, ports) {
-			t.Fatalf("%d: ports: expected %#v, got %#v", i, test.expectedPorts, ports)
+		} else {
+			for pi, expectedPort := range test.expectedPorts {
+				if e, a := expectedPort.Local, ports[pi].Local; e == 0 && a == 0 {
+					t.Fatalf("%d: local expected: !0, got: 0", i)
+				} else if e, a := expectedPort.Local, ports[pi].Local; e != 0 && e != a {
+					t.Fatalf("%d: local expected: %d, got: %d", i, e, a)
+				}
+				if e, a := expectedPort.Remote, ports[pi].Remote; e != a {
+					t.Fatalf("%d: remote expected: %d, got: %d", i, e, a)
+				}
+			}
 		}
 		if e, a := expectedStopChan, pf.stopChan; e != a {
 			t.Fatalf("%d: stopChan: expected %#v, got %#v", i, e, a)
